@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>QR-Code Generator</title>
+    <meta name="theme-color" content="#2563eb">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" href="icons/icon-192.png">
+    <!-- iPad / iOS: Vollbild-App vom Home-Bildschirm -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="QR-Codes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <!-- Lokal vorkompiliertes Tailwind-CSS und lokale QRCode-Bibliothek (kein CDN, daher offline nutzbar) -->
+    <link rel="stylesheet" href="styles.css">
+    <script src="qrcode.min.js"></script>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col items-center font-sans text-slate-800">
+
+    <main class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-4xl">
+        <div class="text-center mb-6">
+            <h1 class="text-2xl font-bold text-slate-900 mb-2">QR-Code Generator</h1>
+            <p class="text-sm text-slate-500">Gib einen Text ein oder kopiere eine Liste (z.B. aus Excel), um mehrere QR-Codes auf einmal zu erstellen.</p>
+        </div>
+
+        <div class="space-y-4">
+            <!-- Eingabefeld -->
+            <div>
+                <textarea
+                    id="textInput"
+                    rows="6"
+                    autocapitalize="off"
+                    autocorrect="off"
+                    spellcheck="false"
+                    class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-none shadow-sm"
+                    placeholder="Ein Eintrag pro Zeile...&#10;Zeile 1&#10;https://beispiel.de&#10;Zeile 3"></textarea>
+            </div>
+
+            <button
+                id="generateBtn"
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors shadow-md active:scale-[0.98]">
+                QR-Codes Generieren
+            </button>
+        </div>
+
+        <!-- Container für die generierten QR-Codes -->
+        <div id="resultContainer" class="mt-10 hidden flex-col w-full animate-fadeIn">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-6 border-b border-slate-100 pb-4 gap-4">
+                <h2 id="resultCount" class="text-lg font-semibold text-slate-700">Generierte Codes</h2>
+                <button id="downloadAllBtn" class="flex items-center gap-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-medium py-2 px-4 rounded-lg transition-colors text-sm active:scale-[0.98]">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Alle speichern
+                </button>
+            </div>
+
+            <div id="qrGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 w-full">
+                <!-- QR Codes werden hier dynamisch eingefügt -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Benachrichtigung -->
+    <div id="toastMessage" class="toast">Nachricht hier</div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const textInput = document.getElementById('textInput');
+            const generateBtn = document.getElementById('generateBtn');
+            const resultContainer = document.getElementById('resultContainer');
+            const qrGrid = document.getElementById('qrGrid');
+            const resultCount = document.getElementById('resultCount');
+            const downloadAllBtn = document.getElementById('downloadAllBtn');
+            const toastMessage = document.getElementById('toastMessage');
+
+            // iPad (auch als "Mac" getarnt) und iPhone erkennen
+            const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+            // Aktuell angezeigte QR-Codes: { canvas, filename, blobPromise, file }
+            let items = [];
+
+            // Zeigt eine kleine Benachrichtigung an
+            function showToast(message, isError = false) {
+                toastMessage.textContent = message;
+                toastMessage.classList.toggle('error', isError);
+                toastMessage.classList.add('show');
+                setTimeout(() => toastMessage.classList.remove('show'), 3000);
+            }
+
+            function makeFilename(text, index) {
+                const safeName = text.substring(0, 15).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                return `qr_${safeName}_${index + 1}.png`;
+            }
+
+            // QR-Codes generieren Funktion
+            function generateQRCodes() {
+                const text = textInput.value.trim();
+
+                if (!text) {
+                    showToast('Bitte gib zuerst einen Text ein.', true);
+                    textInput.focus();
+                    return;
+                }
+
+                // Text an Zeilenumbrüchen aufteilen und leere Zeilen herausfiltern
+                const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+                if (lines.length === 0) return;
+
+                qrGrid.innerHTML = '';
+                items = [];
+
+                resultCount.textContent = `${lines.length} QR-Code${lines.length > 1 ? 's' : ''} generiert`;
+                resultContainer.classList.remove('hidden');
+                resultContainer.classList.add('flex');
+
+                lines.forEach((line, index) => createQRCodeCard(line, index));
+            }
+
+            // Erstellt eine einzelne Karte für das Grid
+            function createQRCodeCard(text, index) {
+                const card = document.createElement('div');
+                card.className = 'bg-white border border-slate-200 rounded-xl p-4 flex flex-col items-center shadow-sm hover:shadow-md transition-shadow';
+
+                // Text Label (wird bei Überlänge abgeschnitten)
+                const label = document.createElement('p');
+                label.className = 'text-xs text-slate-500 mb-3 w-full text-center truncate cursor-help';
+                label.textContent = text;
+                label.title = text;
+                card.appendChild(label);
+
+                const canvasContainer = document.createElement('div');
+                canvasContainer.className = 'p-1 bg-white border border-slate-100 rounded-lg mb-4 w-full flex justify-center';
+                const canvas = document.createElement('canvas');
+                canvas.className = 'w-full max-w-[180px] h-auto';
+                canvasContainer.appendChild(canvas);
+                card.appendChild(canvasContainer);
+
+                const entry = { canvas, filename: makeFilename(text, index), blobPromise: null, file: null };
+                items.push(entry);
+
+                // 360 px Bildbreite, Anzeige ca. 180 px: scharf auf Retina-Displays und im gespeicherten PNG
+                QRCode.toCanvas(canvas, text, {
+                    width: 360,
+                    margin: 2,
+                    color: { dark: '#0f172a', light: '#ffffff' }
+                }, function (error) {
+                    if (error) { console.error('Fehler beim Generieren:', error); return; }
+                    canvas.style.width = '';
+                    canvas.style.height = '';
+                    // PNG vorab erzeugen: Teilen/Kopieren muss auf iOS direkt im Tap passieren
+                    entry.blobPromise = new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                    entry.blobPromise.then(blob => {
+                        if (blob) entry.file = new File([blob], entry.filename, { type: 'image/png' });
+                    });
+                });
+
+                const btnContainer = document.createElement('div');
+                btnContainer.className = 'flex gap-2 w-full mt-auto';
+
+                // Kopieren Button
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'flex-1 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-2 rounded-lg transition-colors';
+                copyBtn.title = 'In die Zwischenablage kopieren';
+                copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+                copyBtn.onclick = () => copyToClipboard(entry);
+
+                // Speichern Button
+                const downloadBtn = document.createElement('button');
+                downloadBtn.className = 'flex-1 flex items-center justify-center bg-emerald-100 hover:bg-emerald-200 text-emerald-800 py-2 px-2 rounded-lg transition-colors';
+                downloadBtn.title = 'Als Bild speichern';
+                downloadBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`;
+                downloadBtn.onclick = async () => {
+                    if (!(await shareFiles([entry.file]))) downloadCanvas(entry.canvas, entry.filename);
+                };
+
+                btnContainer.appendChild(copyBtn);
+                btnContainer.appendChild(downloadBtn);
+                card.appendChild(btnContainer);
+
+                qrGrid.appendChild(card);
+            }
+
+            // Ein einzelnes Canvas herunterladen
+            function downloadCanvas(canvas, filename) {
+                const link = document.createElement('a');
+                link.download = filename;
+                link.href = canvas.toDataURL('image/png');
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+
+            // iPad/iPhone: Teilen-Menü öffnen ("Bild sichern", "In Dateien sichern", AirDrop ...).
+            // Gibt true zurück, wenn das erledigt ist (oder abgebrochen wurde), false für den Download-Fallback.
+            async function shareFiles(files) {
+                if (!IS_IOS || !navigator.canShare || files.some(f => !f)) return false;
+                if (!navigator.canShare({ files })) return false;
+                try {
+                    await navigator.share({ files });
+                } catch (err) {
+                    if (err.name !== 'AbortError') return false;
+                }
+                return true;
+            }
+
+            // Ein einzelnes Bild in die Zwischenablage kopieren
+            function copyToClipboard(entry) {
+                if (!navigator.clipboard || !window.ClipboardItem || !entry.blobPromise) {
+                    showToast('Dein Browser unterstützt das direkte Kopieren nicht.', true);
+                    return;
+                }
+                try {
+                    // Promise im ClipboardItem: von Safari verlangt, damit der Tap als Auslöser gilt
+                    const item = new ClipboardItem({ 'image/png': entry.blobPromise });
+                    navigator.clipboard.write([item])
+                        .then(() => showToast('Bild kopiert!'))
+                        .catch(() => showToast('Kopieren durch Browser-Sicherheitseinstellungen blockiert.', true));
+                } catch (err) {
+                    showToast('Fehler beim Kopieren.', true);
+                }
+            }
+
+            generateBtn.addEventListener('click', generateQRCodes);
+
+            // "Alle speichern": auf iPad ein Teilen-Menü mit allen Bildern, sonst Einzel-Downloads
+            downloadAllBtn.addEventListener('click', async () => {
+                if (items.length === 0) return;
+
+                if (await shareFiles(items.map(i => i.file))) return;
+
+                showToast(`Starte Download von ${items.length} Dateien...`);
+                for (const item of items) {
+                    downloadCanvas(item.canvas, item.filename);
+                    // Kurze Pause, damit der Browser Multi-Downloads nicht blockiert
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                }
+            });
+
+            // Service Worker für den Offline-Betrieb
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js').then(reg => {
+                    // Beim Zurückkehren in die App nach Updates suchen
+                    document.addEventListener('visibilitychange', () => {
+                        if (!document.hidden) reg.update();
+                    });
+                }).catch(err => console.error('Service Worker Fehler:', err));
+            }
+        });
+    </script>
+</body>
+</html>
