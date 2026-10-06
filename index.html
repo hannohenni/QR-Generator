@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>QR-Code Generator</title>
-    <meta name="theme-color" content="#2563eb">
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#e9eefb" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#05070d" media="(prefers-color-scheme: dark)">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <!-- iPad / iOS: Vollbild-App vom Home-Bildschirm -->
@@ -17,15 +19,15 @@
     <link rel="stylesheet" href="styles.css">
     <script src="qrcode.min.js"></script>
 </head>
-<body class="bg-slate-50 min-h-screen flex flex-col items-center font-sans text-slate-800">
+<body class="min-h-screen flex flex-col items-center">
 
-    <main class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-4xl">
-        <div class="text-center mb-6">
-            <h1 class="text-2xl font-bold text-slate-900 mb-2">QR-Code Generator</h1>
-            <p class="text-sm text-slate-500">Gib einen Text ein oder kopiere eine Liste (z.B. aus Excel), um mehrere QR-Codes auf einmal zu erstellen.</p>
+    <main class="w-full max-w-4xl">
+        <div class="mb-6 px-1">
+            <h1 class="large-title">QR-Code Generator</h1>
+            <p class="subtitle">Gib einen Text ein oder kopiere eine Liste (z.B. aus Excel), um mehrere QR-Codes auf einmal zu erstellen.</p>
         </div>
 
-        <div class="space-y-4">
+        <div class="glass p-4 space-y-3">
             <!-- Eingabefeld -->
             <div>
                 <textarea
@@ -34,22 +36,22 @@
                     autocapitalize="off"
                     autocorrect="off"
                     spellcheck="false"
-                    class="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-none shadow-sm"
+                    class="glass-input w-full resize-none"
                     placeholder="Ein Eintrag pro Zeile...&#10;Zeile 1&#10;https://beispiel.de&#10;Zeile 3"></textarea>
             </div>
 
             <button
                 id="generateBtn"
-                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors shadow-md active:scale-[0.98]">
+                class="btn btn-prominent w-full">
                 QR-Codes Generieren
             </button>
         </div>
 
         <!-- Container für die generierten QR-Codes -->
-        <div id="resultContainer" class="mt-10 hidden flex-col w-full animate-fadeIn">
-            <div class="flex flex-col sm:flex-row justify-between items-center mb-6 border-b border-slate-100 pb-4 gap-4">
-                <h2 id="resultCount" class="text-lg font-semibold text-slate-700">Generierte Codes</h2>
-                <button id="downloadAllBtn" class="flex items-center gap-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-medium py-2 px-4 rounded-lg transition-colors text-sm active:scale-[0.98]">
+        <div id="resultContainer" class="mt-8 hidden flex-col w-full animate-fadeIn">
+            <div class="flex flex-row justify-between items-center mb-4 px-1 gap-3">
+                <h2 id="resultCount" class="text-[22px] font-bold tracking-tight">Generierte Codes</h2>
+                <button id="downloadAllBtn" class="btn btn-glass text-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                         <polyline points="7 10 12 15 17 10"></polyline>
@@ -125,17 +127,17 @@
             // Erstellt eine einzelne Karte für das Grid
             function createQRCodeCard(text, index) {
                 const card = document.createElement('div');
-                card.className = 'bg-white border border-slate-200 rounded-xl p-4 flex flex-col items-center shadow-sm hover:shadow-md transition-shadow';
+                card.className = 'glass p-4 flex flex-col items-center';
 
                 // Text Label (wird bei Überlänge abgeschnitten)
                 const label = document.createElement('p');
-                label.className = 'text-xs text-slate-500 mb-3 w-full text-center truncate cursor-help';
+                label.className = 'text-xs text-secondary mb-3 w-full text-center truncate cursor-help';
                 label.textContent = text;
                 label.title = text;
                 card.appendChild(label);
 
                 const canvasContainer = document.createElement('div');
-                canvasContainer.className = 'p-1 bg-white border border-slate-100 rounded-lg mb-4 w-full flex justify-center';
+                canvasContainer.className = 'qr-tile mb-4 w-full flex justify-center';
                 const canvas = document.createElement('canvas');
                 canvas.className = 'w-full max-w-[180px] h-auto';
                 canvasContainer.appendChild(canvas);
@@ -165,14 +167,14 @@
 
                 // Kopieren Button
                 const copyBtn = document.createElement('button');
-                copyBtn.className = 'flex-1 flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 py-2 px-2 rounded-lg transition-colors';
+                copyBtn.className = 'btn btn-glass flex-1';
                 copyBtn.title = 'In die Zwischenablage kopieren';
                 copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
                 copyBtn.onclick = () => copyToClipboard(entry);
 
                 // Speichern Button
                 const downloadBtn = document.createElement('button');
-                downloadBtn.className = 'flex-1 flex items-center justify-center bg-emerald-100 hover:bg-emerald-200 text-emerald-800 py-2 px-2 rounded-lg transition-colors';
+                downloadBtn.className = 'btn btn-tint flex-1';
                 downloadBtn.title = 'Als Bild speichern';
                 downloadBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>`;
                 downloadBtn.onclick = async () => {
